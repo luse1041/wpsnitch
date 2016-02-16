@@ -38,7 +38,7 @@ class Snitch(object):
         parts = parsed_url.path.split('/')
 
         try:
-            self.sku_id = parts[5]
+            self.sku_id = parts[5].lower()
         except IndexError:
             raise InvalidUrlException
 
