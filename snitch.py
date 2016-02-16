@@ -60,10 +60,8 @@ class Snitch(object):
 
         if entry:
             entry.data = data
-            entry.updated = datetime.datetime.now()
         else:
-            entry = AppCache(sku_id=self.sku_id, data=data, \
-                             updated=datetime.datetime.now())
+            entry = AppCache(sku_id=self.sku_id, data=data)
 
         entry.put()
 
