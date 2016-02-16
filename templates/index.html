@@ -1,0 +1,62 @@
+{# This software is in the public domain. Where that dedication is not
+   recognized, you are granted a perpetual, irrevocable license to copy,
+   distribute, and modify this file as you see fit. #}
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>WP Snitch</title>
+        <style>
+            input[type=text] { width: 300px; }
+            p.intro em { cursor: pointer; }
+        </style>
+        <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+    </head>
+    <body>
+        <p class="intro">
+            Enter the URL of any app on the Windows Store.<br>
+            Example: <em>https://www.microsoft.com/en-us/store/apps/instagram-beta/9wzdncrfhw8m</em>
+        </p>
+        <form>
+            <input type="text" placeholder="" name="url">
+            <input type="submit">
+        </form>
+        <p id="status"></p>
+
+        <a href="https://www.reddit.com/message/compose/?to=svn">Contact</a>
+        ‐
+        <a href="https://gitlab.com/subversion/wpsnitch">Source code</a>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+        <script>
+            jQuery("p.intro em").on("click", function(e) {
+                e.preventDefault();
+
+                jQuery("form input[name=url]").val(jQuery(this).html());
+                jQuery("form").submit();
+            });
+
+            jQuery("form").on("submit", function(e) {
+                e.preventDefault();
+
+                jQuery("#status").html("Wait...");
+                jQuery("form input[type=submit]").attr("disabled", "disabled");
+
+                jQuery.ajax({
+                    type: "POST",
+                    url: "/fetch",
+                    data: $(this).serialize(),
+                    dataType: "json",
+                    success: function(data) {
+                        jQuery("#status").html(data.output);
+                        jQuery("form input[type=submit]").removeAttr("disabled");
+                    },
+                    error: function(data) {
+                        jQuery("#status").html("oh lad, something went wrong");
+                        jQuery("form input[type=submit]").removeAttr("disabled");
+                    },
+                });
+            });
+        </script>
+    </body>
+</html>
