@@ -27,7 +27,7 @@ class Snitch(object):
         self.url = url
         self.sku_id = None
         self.guid = None
-        self.data = None
+        self.data = {}
 
     def get_sku_id(self):
         parsed_url = urlparse(self.url)
@@ -38,7 +38,7 @@ class Snitch(object):
         parts = parsed_url.path.split('/')
 
         try:
-            self.sku_id = parts[5].lower()
+            self.sku_id = parts[5].lower()[:12]
         except IndexError:
             raise InvalidUrlException
 
@@ -46,13 +46,14 @@ class Snitch(object):
         q = db.Query(AppCache)
         q.filter("sku_id =", self.sku_id)
         q.filter("updated >", datetime.datetime.now() \
-                              - datetime.timedelta(hours=12))
+                              - datetime.timedelta(days=1))
         entry = q.get()
 
-        self.data = pickle.loads(entry.data) if entry else None
+        if entry:
+            self.data = pickle.loads(entry.data.encode('windows-1252'))
 
     def set_cache(self):
-        data = pickle.dumps(self.data)
+        data = pickle.dumps(self.data).decode('windows-1252')
 
         q = db.Query(AppCache)
         q.filter("sku_id =", self.sku_id)
@@ -146,7 +147,6 @@ class Snitch(object):
         fix_date = lambda date: date[:19].replace('T', ' ')
 
         try:
-            self.data = {}
             self.data['name'] = xml_get('a:title')
             self.data['version'] = xml_get('version')
             self.data['last_updated'] = fix_date(xml_get('skuLastUpdated'))
