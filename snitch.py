@@ -2,10 +2,14 @@
 # recognized, you are granted a perpetual, irrevocable license to copy,
 # distribute, and modify this file as you see fit.
 
+import datetime
 import json
+import pickle
 import urllib2
 from urlparse import urlparse
 from xml.dom import minidom
+
+from google.appengine.ext import db
 
 class InvalidUrlException(Exception):
     pass
@@ -13,12 +17,17 @@ class InvalidUrlException(Exception):
 class InternalErrorException(Exception):
     pass
 
+class AppCache(db.Model):
+    sku_id = db.StringProperty(required=True)
+    data = db.TextProperty(required=True)
+    updated = db.DateTimeProperty(auto_now=True)
+
 class Snitch(object):
     def __init__(self, url):
         self.url = url
         self.sku_id = None
         self.guid = None
-        self.data = {}
+        self.data = None
 
     def get_sku_id(self):
         parsed_url = urlparse(self.url)
@@ -33,9 +42,40 @@ class Snitch(object):
         except IndexError:
             raise InvalidUrlException
 
+    def get_cache(self):
+        q = db.Query(AppCache)
+        q.filter("sku_id =", self.sku_id)
+        q.filter("updated >", datetime.datetime.now() \
+                              - datetime.timedelta(hours=12))
+        entry = q.get()
+
+        self.data = pickle.loads(entry.data) if entry else None
+
+    def set_cache(self):
+        data = pickle.dumps(self.data)
+
+        q = db.Query(AppCache)
+        q.filter("sku_id =", self.sku_id)
+        entry = q.get()
+
+        if entry:
+            entry.data = data
+            entry.updated = datetime.datetime.now()
+        else:
+            entry = AppCache(sku_id=self.sku_id, data=data, \
+                             updated=datetime.datetime.now())
+
+        entry.put()
+
     def get(self):
         # Get the SKU id from the url
         self.get_sku_id()
+
+        # check the cache and return already if it's populated
+        self.get_cache()
+
+        if self.data:
+            return
 
         # First, we need to convert the SKU id (used in Windows 10)
         # to a GUID (used in Windows 8.1, the only API that still shows
@@ -107,11 +147,17 @@ class Snitch(object):
 
         fix_date = lambda date: date[:19].replace('T', ' ')
 
-        self.data['name'] = xml_get('a:title')
-        self.data['version'] = xml_get('version')
-        self.data['last_updated'] = fix_date(xml_get('skuLastUpdated'))
-        self.data['release_date'] = fix_date(xml_get('releaseDate'))
-        self.data['download_link'] = xml_get('url')
-        self.data['package_format'] = xml_get('packageFormat')
-        tmp = xml_get('packageSize')
-        self.data['package_size'] = '%.2f' % (float(tmp) / (1024 * 1024),)
+        try:
+            self.data = {}
+            self.data['name'] = xml_get('a:title')
+            self.data['version'] = xml_get('version')
+            self.data['last_updated'] = fix_date(xml_get('skuLastUpdated'))
+            self.data['release_date'] = fix_date(xml_get('releaseDate'))
+            self.data['download_link'] = xml_get('url')
+            self.data['package_format'] = xml_get('packageFormat')
+            tmp = xml_get('packageSize')
+            self.data['package_size'] = '%.2f' % (float(tmp) / (1024 * 1024),)
+        except TypeError, e:
+            raise InternalErrorException('Error 8')
+
+        self.set_cache()
