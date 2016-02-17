@@ -4,6 +4,7 @@
 
 import datetime
 import json
+import logging
 import pickle
 import urllib2
 from urlparse import urlparse
@@ -44,8 +45,8 @@ class Snitch(object):
 
     def get_cache(self):
         q = db.Query(AppCache)
-        q.filter("sku_id =", self.sku_id)
-        q.filter("updated >", datetime.datetime.now() \
+        q.filter('sku_id =', self.sku_id)
+        q.filter('updated >', datetime.datetime.now() \
                               - datetime.timedelta(days=1))
         entry = q.get()
 
@@ -56,10 +57,11 @@ class Snitch(object):
         data = pickle.dumps(self.data).decode('windows-1252')
 
         q = db.Query(AppCache)
-        q.filter("sku_id =", self.sku_id)
+        q.filter('sku_id =', self.sku_id)
         entry = q.get()
 
         if entry:
+            logging.info('Cache refresh: %s' % self.sku_id)
             entry.data = data
         else:
             entry = AppCache(sku_id=self.sku_id, data=data)
@@ -75,6 +77,8 @@ class Snitch(object):
 
         if self.data:
             return
+
+        logging.info('Cache miss: %s' % self.sku_id)
 
         # First, we need to convert the SKU id (used in Windows 10)
         # to a GUID (used in Windows 8.1, the only API that still shows
@@ -105,13 +109,13 @@ class Snitch(object):
 
         # we'll parse the last payload
         try:
-            payload = response_dict[len(response_dict) - 1]['Payload']
+            payload = response_dict[-1]['Payload']
         except KeyError, e:
             raise InternalErrorException('Error 3')
 
         try:
             package_names = payload['PackageFamilyNames']
-            self.guid = package_names[len(package_names) - 1].split('_')[0]
+            self.guid = package_names[-1].split('_')[0]
         except KeyError, e:
             raise InternalErrorException('Error 4. Probably an invalid URL')
 
