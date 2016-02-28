@@ -31,13 +31,15 @@
             <input type="submit">
         </form>
         <p id="status"></p>
-
-        <a href="https://www.reddit.com/message/compose/?to=svn">Contact</a>
-        ‐
-        <a href="https://gitlab.com/subversion/wpsnitch">Source code</a>
+        <p>
+            <a href="https://www.reddit.com/message/compose/?to=svn">Contact</a>
+            ‐
+            <a href="https://gitlab.com/subversion/wpsnitch">Source code</a>
+        </p>
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
         <script>
+            var $ = "_";
             jQuery("p.intro em").on("click", function(e) {
                 e.preventDefault();
 
@@ -54,7 +56,7 @@
                 jQuery.ajax({
                     type: "POST",
                     url: "/fetch",
-                    data: $(this).serialize(),
+                    data: jQuery(this).serialize(),
                     dataType: "json",
                     success: function(data) {
                         jQuery("#status").html(data.output);

@@ -148,7 +148,11 @@ class Snitch(object):
                 raise InternalErrorException('Error 7')
             return value
 
-        fix_date = lambda date: date[:19].replace('T', ' ')
+        def fix_date(date):
+            if date == '1601-01-01T00:00:00.000000Z':
+                return 'Never'
+
+            return date[:19].replace('T', ' ')
 
         try:
             self.data['name'] = xml_get('a:title')
