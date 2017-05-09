@@ -97,10 +97,17 @@ class App(object):
         if parsed_url.netloc != 'www.microsoft.com':
             raise SnitchException('Invalid URL.')
 
-        parts = parsed_url.path.split('/')
+        parts = parsed_url.path.split('/')[1:]
+
+        # https://www.microsoft.com/en-us/store/p/instagram/9nblggh5l9xt
+        # https://www.microsoft.com/store/app/9nblggh5l9xt
+        if parts[0] == 'store':
+            sku_id_idx = 2
+        elif parts[1] == 'store':
+            sku_id_idx = 4
 
         try:
-            self.sku_id = parts[5].lower()[:12]
+            self.sku_id = parts[sku_id_idx].lower()[:12]
         except IndexError:
             raise SnitchException('Invalid URL.')
 
