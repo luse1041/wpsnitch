@@ -8,6 +8,7 @@ import logging
 import pickle
 import urllib2
 from urlparse import urlparse
+from xml.dom.minidom import parseString as parse_xml
 
 from google.appengine.ext import db
 
@@ -23,24 +24,17 @@ class AppCache(db.Model):
 
 
 class App(object):
+    URL = ('https://storeedgefd.dsx.mp.microsoft.com/'
+           'v8.0/pages/pdp?productId={sku_id}&market=US&locale=en-US'
+           '&appversion=11703.1001.45.0')
+    LEGACY_URL = ('http://marketplaceedgeservice.windowsphone.com/v9/catalog/'
+                  'apps/{guid}?os=8.10.12393.0&cc=us&lang=en-us&moId=')
+
     def __init__(self, url):
         self.url = url
         self.sku_id = None
         self.guid = None
         self.data = {}
-
-    def get_sku_id(self):
-        parsed_url = urlparse(self.url)
-
-        if parsed_url.netloc != 'www.microsoft.com':
-            raise SnitchException('Invalid URL.')
-
-        parts = parsed_url.path.split('/')
-
-        try:
-            self.sku_id = parts[5].lower()[:12]
-        except IndexError:
-            raise SnitchException('Invalid URL.')
 
     @staticmethod
     def find_payload(response):
@@ -58,6 +52,17 @@ class App(object):
                     in payload['$type']):
                 return payload
         raise SnitchException('No app details in the response from the Store.')
+
+    @staticmethod
+    def find_legacy_guid(payload):
+        """find the guid in the legacy payload inside the normal payload"""
+        try:
+            for alternate_id in payload['AlternateIds']:
+                if (alternate_id['AlternateIdType'] ==
+                        'LegacyWindowsPhoneProductId'):
+                    return alternate_id['AlternateIdValue']
+        except KeyError:
+            return None
 
     def get_cache(self):
         q = db.Query(AppCache)
@@ -86,8 +91,18 @@ class App(object):
         entry.put()
 
     def get(self):
-        # Get the SKU id from the url
-        self.get_sku_id()
+        # get the sku id
+        parsed_url = urlparse(self.url)
+
+        if parsed_url.netloc != 'www.microsoft.com':
+            raise SnitchException('Invalid URL.')
+
+        parts = parsed_url.path.split('/')
+
+        try:
+            self.sku_id = parts[5].lower()[:12]
+        except IndexError:
+            raise SnitchException('Invalid URL.')
 
         # check the cache and return already if it's populated
         self.get_cache()
@@ -97,9 +112,7 @@ class App(object):
 
         logging.info('Cache miss: %s' % self.sku_id)
 
-        request_url = 'https://storeedgefd.dsx.mp.microsoft.com/' \
-            'v8.0/pages/pdp?productId={sku_id}&market=US&locale=en-US' \
-            '&appversion=11703.1001.45.0'.format(sku_id=self.sku_id)
+        request_url = self.URL.format(sku_id=self.sku_id)
 
         try:
             request = urllib2.Request(request_url)
@@ -121,10 +134,39 @@ class App(object):
 
             return date[:19].replace('T', ' ')
 
+        # all of this is "optional" so it's in a gigantic try block
+        last_updated_legacy = None
         try:
+            guid = self.find_legacy_guid(payload)
+            request_url = self.LEGACY_URL.format(guid=guid)
+            request = urllib2.Request(request_url)
+            response = urllib2.urlopen(request).read()
+
+            # remove the stupid BOM
+            while not response.startswith('<') and len(response) > 0:
+                response = response[1:]
+
+            el = (
+                parse_xml(response)
+                .getElementsByTagName('skuLastUpdated')[0]
+                .firstChild
+            )
+            last_updated_legacy = fix_date(el.nodeValue)
+        except Exception, e:
+            logging.warning('Error getting the legacy data: %s', e)
+
+        try:
+            # always there
             self.data['name'] = payload['Title']
-            self.data['last_updated'] = fix_date(payload['LastUpdateDateUtc'])
             self.data['release_date'] = fix_date(payload['ReleaseDateUtc'])
+
+            # w10 app only if there are platforms
+            if 'Platforms' in payload:
+                self.data['last_updated'] = \
+                    fix_date(payload['LastUpdateDateUtc'])
+
+            if last_updated_legacy:
+                self.data['last_updated_legacy'] = last_updated_legacy
         except KeyError:
             raise SnitchException("Can't find what I'm looking for.")
 

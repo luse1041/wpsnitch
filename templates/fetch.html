@@ -7,7 +7,12 @@
      limited. The source code is available and easy to read and port, use
      that instead. Thanks. -->
 <ul>
-    <li><strong>App name:</strong> {{data.name}}</li>
-    <li><strong>First published on:</strong> {{data.release_date}}</li>
-    <li><strong>Last updated on:</strong> {{data.last_updated}}</li>
+    <li><strong>App name:</strong> {{ data.name }}</li>
+    <li><strong>First published on:</strong> {{ data.release_date }}</li>
+    {% if data.last_updated_legacy %}
+        <li><strong>Last updated (WP8):</strong> {{ data.last_updated_legacy }}</li>
+    {% endif %}
+    {% if data.last_updated %}
+        <li><strong>Last updated (W10):</strong> {{ data.last_updated }}</li>
+    {% endif %}
 </ul>
