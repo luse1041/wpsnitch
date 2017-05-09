@@ -5,7 +5,6 @@ read the code and replicate its behaviour--please, don't use the appspot
 website as an API! It's on the free tier of App Engine and its quota is very
 limited.
 
-The code is here, but GitLab is fucking dumb and does not show the file list
-on the main page of the project. Click "Files", in the sidebar, to see it.
+Please don't ask me if you can create an app based on this code. Yes, you can.
 
 Everything is in the public domain, do whatever you want with the code.

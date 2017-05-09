@@ -7,11 +7,13 @@ import json
 import webapp2
 import os
 
-from snitch import Snitch, InvalidUrlException, InternalErrorException
+from snitch import App, SnitchException
+
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir),
                                autoescape=True)
+
 
 class Handler(webapp2.RequestHandler):
     def write(self, *a, **kw):
@@ -24,9 +26,11 @@ class Handler(webapp2.RequestHandler):
     def render(self, template, **kw):
         self.write(self.render_str(template, **kw))
 
+
 class MainPage(Handler):
     def get(self):
         self.render('index.html')
+
 
 class FetchPage(Handler):
     def json_write(self, text):
@@ -36,16 +40,15 @@ class FetchPage(Handler):
         self.response.headers['Content-Type'] = 'application/json'
 
         url = self.request.get('url')
-        snitch = Snitch(url)
+        snitch = App(url)
 
         try:
             snitch.get()
             output = self.render_str('fetch.html', data=snitch.data)
             self.json_write(output)
-        except InvalidUrlException:
-            self.json_write('This is not a valid URL it seems.')
-        except InternalErrorException, e:
-            self.json_write(e.message)
+        except SnitchException, e:
+            self.json_write('Error: %s' % e.message)
+
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
